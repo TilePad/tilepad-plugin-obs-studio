@@ -1,0 +1,98 @@
+[env]
+# Name of the binary cargo will compile 
+CARGO_BINARY_NAME = "tilepad-plugin-obs-studio"
+
+# ====================== BUNDLING ======================    
+
+[tasks.bundle]
+command = "tilepad"
+args = ["bundle"]
+dependencies = ["build-all"]
+
+
+# ====================== RUNNING DEV ======================    
+
+# Locally run the plugin in debug mode
+[tasks.run-debug]
+env = { RUST_LOG = "debug" }
+command = "cargo"
+args = [
+    "run",
+    "--",
+    "--plugin-id",
+    "com.jacobtread.tilepad.obs-studio",
+    "--connect-url",
+    "ws://localhost:59371/plugins/ws",
+]
+
+# Locally run the plugin in debug mode (Watching for changes)
+[tasks.watch-debug]
+env = { RUST_LOG = "debug" }
+command = "cargo"
+args = [
+    "watch",
+    "-x",
+    "run -- --plugin-id com.jacobtread.tilepad.obs-studio --connect-url ws://localhost:59371/plugins/ws",
+]
+
+
+# ====================== BUILDING ALL ======================    
+
+# Build all binaries 
+[tasks.build-all]
+run_task = { name = [
+    "clean-build",
+    "build-windows-x64",
+    "build-linux-x64",
+    "build-windows-x86",
+    "build-linux-x86",
+] }
+
+# ====================== BUILDING TARGETS ======================    
+
+# Build a 64bit windows binary
+[tasks.build-windows-x64]
+env = { RUST_TARGET = "x86_64-pc-windows-gnu", BINARY_NAME = "${CARGO_BINARY_NAME}.exe", BINARY_OUT_NAME = "plugin-windows-x64.exe" }
+run_task = [{ name = "tilepad-build-release" }]
+
+# Build a 32bit windows binary
+[tasks.build-windows-x86]
+env = { RUST_TARGET = "i686-pc-windows-gnu", BINARY_NAME = "${CARGO_BINARY_NAME}.exe", BINARY_OUT_NAME = "plugin-windows-x86.exe" }
+run_task = [{ name = "tilepad-build-release" }]
+
+# Build a 64bit linux binary
+[tasks.build-linux-x64]
+env = { RUST_TARGET = "x86_64-unknown-linux-musl", BINARY_NAME = "${CARGO_BINARY_NAME}", BINARY_OUT_NAME = "plugin-linux-x64" }
+run_task = [{ name = "tilepad-build-release" }]
+
+# Build a 32bit linux binary
+[tasks.build-linux-x86]
+env = { RUST_TARGET = "i686-unknown-linux-musl", BINARY_NAME = "${CARGO_BINARY_NAME}", BINARY_OUT_NAME = "plugin-linux-x86" }
+run_task = [{ name = "tilepad-build-release" }]
+
+
+# ====================== BUILDING AND COPYING ======================    
+
+# Task to perform a build -> copy -> clean
+[tasks.tilepad-build-release]
+condition = { env_set = ["RUST_TARGET", "BINARY_NAME", "BINARY_OUT_NAME"] }
+run_task = { name = ["cross-build", "copy-build", "clean-build"] }
+
+# Task to perform a rust build using cross
+[tasks.cross-build]
+condition = { env_set = ["RUST_TARGET"] }
+command = "cross"
+args = ["build", "--target", "${RUST_TARGET}", "--release"]
+
+# Task to copy the output of a build using cross
+[tasks.copy-build]
+condition = { env_set = ["RUST_TARGET", "BINARY_NAME", "BINARY_OUT_NAME"] }
+script_runner = "@shell"
+script = "cp target/${RUST_TARGET}/release/${BINARY_NAME} .tilepadPlugin/bin/${BINARY_OUT_NAME}"
+
+
+# Task to clean the build output 
+# (Required between x64 and x86 builds)
+[tasks.clean-build]
+command = "cargo"
+args = ["clean"]

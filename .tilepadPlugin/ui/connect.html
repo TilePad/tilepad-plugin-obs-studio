@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="root" style="display: contents;"></div>
+</body>
+
+<script>
+    let currentAction = null;
+
+    function setView(content) {
+        const root = document.getElementById("root");
+        root.innerHTML = "";
+        root.appendChild(content);
+    }
+
+    function createLoadingView(message) {
+        const container = document.createElement("div");
+        const title = document.createElement("h1");
+        title.textContent = "Loading..."
+        title.classList.add("title")
+        const text = document.createElement("p");
+        text.textContent = message;
+        text.classList.add("text")
+
+        container.appendChild(title);
+        container.appendChild(text);
+
+        return container
+    }
+
+    function createDisconnectedView() {
+        const container = document.createElement("div");
+        const title = document.createElement("h1");
+        title.textContent = "Not Connected"
+        title.classList.add("title")
+        const text = document.createElement("p");
+        text.textContent = "Ensure OBS studio is running and that you specified "
+        text.classList.add("text")
+
+        container.appendChild(title);
+        container.appendChild(text);
+
+        return container
+    }
+
+    function createConnectView(error) {
+        const container = document.createElement("div");
+        const title = document.createElement("h1");
+        title.textContent = "OBS Studio Socket"
+        title.classList.add("title")
+
+        const host = document.createElement("input");
+        host.type = "text";
+        host.value = "localhost";
+
+        const port = document.createElement("input");
+        port.type = "number";
+        port.value = 4455;
+
+        const password = document.createElement("input");
+        password.type = "password";
+        password.value = "";
+
+
+
+        const button = document.createElement("button");
+        button.textContent = "Connect"
+        button.onclick = () => {
+            // Set to loading state
+            setView(createLoadingView("Connecting..."));
+
+            // Request that the plugin authorize
+            window.tilepad.sendPluginMessage({
+                type: "CONNECT",
+                auth: {
+                    host: host.value,
+                    port: Number(port.value),
+                    password: password.value
+                }
+            })
+        }
+        button.classList.add("tile-button")
+
+        container.appendChild(title);
+        container.appendChild(host);
+        container.appendChild(port);
+        container.appendChild(password);
+        container.appendChild(button);
+
+        if (error) {
+            const text = document.createElement("p");
+            text.textContent = error;
+            text.classList.add("text")
+            container.appendChild(text)
+        }
+
+
+        return container
+    }
+
+    // Set initial loading state
+    setView(createLoadingView("Connecting..."));
+
+    // Handle properties received
+    window.tilepad.onProperties((newProperties, ctx) => {
+        properties = newProperties;
+        currentAction = ctx.actionId;
+
+        // Request connection state from the plugin
+        window.tilepad.sendPluginMessage({
+            type: "GET_CLIENT_STATE"
+        })
+    });
+
+
+
+    function onInitial() {
+        setView(createLoadingView("Initializing..."))
+    }
+
+
+    function onNotConnected() {
+        // Show authorize view
+        setView(createConnectView("Not connected"));
+    }
+
+    function onConnecting() {
+        setView(createLoadingView("Connecting..."))
+    }
+
+    function onConnected() {
+        switch (currentAction) {
+            case "toggle_recording":
+                window.location.href = "./toggle-recording.html";
+                break;
+        }
+    }
+
+    function onConnectError() {
+        setView(createConnectView("Connection error"));
+    }
+
+    function onConnectionLost() {
+        setView(createConnectView("Connection lost"));
+    }
+
+
+    const State = {
+        INITIAL: "INITIAL",
+        NOT_CONNECTED: "NOT_CONNECTED",
+        CONNECTING: "CONNECTED",
+        CONNECTED: "CONNECTED",
+        CONNECT_ERROR: "CONNECT_ERROR",
+        CONNECTION_LOST: "CONNECTION_LOST"
+    }
+
+    const STATE_CALLBACKS = {
+        [State.INITIAL]: onInitial,
+        [State.NOT_CONNECTED]: onNotConnected,
+        [State.CONNECTING]: onConnecting,
+        [State.CONNECTED]: onConnected,
+        [State.CONNECT_ERROR]: onConnectError,
+        [State.CONNECTION_LOST]: onConnectionLost
+    }
+
+
+    // Handle messages from plugin
+    window.tilepad.onPluginMessage((data) => {
+        switch (data.type) {
+            case "CLIENT_STATE": {
+                const state = data.state;
+                const callback = STATE_CALLBACKS[state];
+                if (callback) callback();
+            }
+        }
+    });
+
+    // Request the current properties
+    window.tilepad.requestProperties();
+</script>
+
+</html>

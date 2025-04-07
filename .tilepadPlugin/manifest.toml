@@ -1,0 +1,34 @@
+[plugin]
+id = "com.jacobtread.tilepad.obs-studio"
+name = "OBS Studio"
+version = "0.0.1"
+authors = ["Jacobtread"]
+description = "Tilepad OBS actions"
+
+[category]
+label = "OBS"
+
+[[bin.native]]
+os = "windows"
+arch = "x64"
+path = "bin/plugin-windows-x64.exe"
+
+[[bin.native]]
+os = "windows"
+arch = "x86"
+path = "bin/plugin-windows-x86.exe"
+
+[[bin.native]]
+os = "linux"
+arch = "x64"
+path = "bin/plugin-linux-x64"
+
+[[bin.native]]
+os = "linux"
+arch = "x86"
+path = "bin/plugin-linux-x86"
+
+[actions.toggle_recording]
+label = "Toggle Recording"
+description = "Start or stop a recording"
+inspector = "ui/connect.html"
