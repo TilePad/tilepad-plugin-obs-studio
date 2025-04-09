@@ -28,7 +28,27 @@ os = "linux"
 arch = "x86"
 path = "bin/plugin-linux-x86"
 
-[actions.toggle_recording]
-label = "Toggle Recording"
-description = "Start or stop a recording"
+[actions.recording]
+label = "Recording"
+description = "Interaction with OBS recording capabilities"
+inspector = "ui/connect.html"
+
+[actions.streaming]
+label = "Stream"
+description = "Interaction with OBS streaming capabilities"
+inspector = "ui/connect.html"
+
+[actions.virtual_camera]
+label = "Virtual Cam"
+description = "Interaction with OBS virtual camera capabilities"
+inspector = "ui/connect.html"
+
+[actions.switch_scene]
+label = "Switch Scene"
+description = "Switch to a specific scene"
+inspector = "ui/connect.html"
+
+[actions.switch_profile]
+label = "Switch Profile"
+description = "Switch to a specific OBS profile"
 inspector = "ui/connect.html"

@@ -1,6 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
-
 use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, rc::Rc};
 use tilepad_plugin_sdk::{
     inspector::Inspector, plugin::Plugin, protocol::TileInteractionContext,
     session::PluginSessionHandle, tracing,
@@ -184,9 +183,7 @@ impl Plugin for ObsPlugin {
     ) {
         let message: InspectorMessageIn = match serde_json::from_value(message) {
             Ok(value) => value,
-            Err(cause) => {
-                return;
-            }
+            Err(_) => return,
         };
 
         let session = session.clone();
@@ -217,20 +214,112 @@ impl Plugin for ObsPlugin {
     ) {
         let action_id = ctx.action_id.as_str();
         match action_id {
-            "toggle_recording" => {
-                let state = self.state.clone();
-                spawn_local(async move {
-                    let client = &mut *state.client_state.lock().await;
-                    let client = match client {
-                        ClientState::Connected { client } => client,
-                        _ => return,
-                    };
-                    client.recording().toggle().await.unwrap();
+            "recording" => {
+                let properties: RecordingActionProperties = match serde_json::from_value(properties)
+                {
+                    Ok(value) => value,
+                    Err(_) => return,
+                };
+
+                let action: RecordingAction = match properties.action {
+                    Some(value) => value,
+                    None => return,
+                };
+
+                run_with_client(self.state.clone(), async move |client| match action {
+                    RecordingAction::StartStop => {
+                        if let Err(cause) = client.recording().toggle().await {
+                            tracing::error!(?cause, "failed to toggle recording");
+                        }
+                    }
+                    RecordingAction::Start => {
+                        if let Err(cause) = client.recording().start().await {
+                            tracing::error!(?cause, "failed to start recording");
+                        }
+                    }
+                    RecordingAction::Stop => {
+                        if let Err(cause) = client.recording().stop().await {
+                            tracing::error!(?cause, "failed to stop recording");
+                        }
+                    }
+                    RecordingAction::PauseResume => {
+                        if let Err(cause) = client.recording().toggle_pause().await {
+                            tracing::error!(?cause, "failed to toggle recording pause");
+                        }
+                    }
+                    RecordingAction::Pause => {
+                        if let Err(cause) = client.recording().pause().await {
+                            tracing::error!(?cause, "failed to pause recording");
+                        }
+                    }
+                    RecordingAction::Resume => {
+                        if let Err(cause) = client.recording().resume().await {
+                            tracing::error!(?cause, "failed to resume recording");
+                        }
+                    }
                 });
             }
+
             action_id => {
                 tracing::debug!(?action_id, "unknown tile action requested")
             }
         }
     }
+}
+
+/// Run the provided action in a local background task using the
+/// obs client (Only runs if the client is connected)
+fn run_with_client<F>(state: Rc<State>, action: F)
+where
+    F: for<'a> AsyncFnOnce(&'a mut obws::Client) -> (),
+    F: 'static,
+{
+    spawn_local(async move {
+        let client = &mut *state.client_state.lock().await;
+        let client = match client {
+            ClientState::Connected { client } => client,
+            _ => return,
+        };
+
+        action(client).await;
+    });
+}
+
+#[derive(Deserialize)]
+struct RecordingActionProperties {
+    action: Option<RecordingAction>,
+}
+
+#[derive(Deserialize)]
+enum RecordingAction {
+    StartStop,
+    Start,
+    Stop,
+    PauseResume,
+    Pause,
+    Resume,
+}
+
+#[derive(Deserialize)]
+struct StreamActionProperties {
+    action: Option<StreamAction>,
+}
+
+#[derive(Deserialize)]
+enum StreamAction {
+    StartStop,
+    Start,
+    Stop,
+}
+
+#[derive(Deserialize)]
+struct VirtualCamActionProperties {
+    action: Option<VirtualCamAction>,
+}
+
+#[derive(Deserialize)]
+enum VirtualCamAction {
+    StartStop,
+    Start,
+    Stop,
 }

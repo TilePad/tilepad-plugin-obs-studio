@@ -137,8 +137,14 @@
 
     function onConnected() {
         switch (currentAction) {
-            case "toggle_recording":
-                window.location.href = "./toggle-recording.html";
+            case "recording":
+                window.location.href = "./recording.html";
+                break;
+            case "streaming":
+                window.location.href = "./streaming.html";
+                break;
+            case "virtual_camera":
+                window.location.href = "./virtual_camera.html";
                 break;
         }
     }
