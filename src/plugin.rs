@@ -266,7 +266,30 @@ impl Plugin for ObsPlugin {
                 });
             }
             Action::Streaming(properties) => todo!(),
-            Action::VirtualCamera(properties) => todo!(),
+            Action::VirtualCamera(properties) => {
+                let action: VirtualCameraAction = match properties.action {
+                    Some(value) => value,
+                    None => return,
+                };
+
+                run_with_client(self.state.clone(), async move |client| match action {
+                    VirtualCameraAction::StartStop => {
+                        if let Err(cause) = client.virtual_cam().toggle().await {
+                            tracing::error!(?cause, "failed to toggle virtual camera");
+                        }
+                    }
+                    VirtualCameraAction::Start => {
+                        if let Err(cause) = client.virtual_cam().start().await {
+                            tracing::error!(?cause, "failed to start virtual camera");
+                        }
+                    }
+                    VirtualCameraAction::Stop => {
+                        if let Err(cause) = client.virtual_cam().stop().await {
+                            tracing::error!(?cause, "failed to stop virtual camera");
+                        }
+                    }
+                });
+            }
         }
     }
 }
@@ -338,11 +361,11 @@ enum StreamAction {
 
 #[derive(Deserialize)]
 struct VirtualCameraActionProperties {
-    action: Option<VirtualCamAction>,
+    action: Option<VirtualCameraAction>,
 }
 
 #[derive(Deserialize)]
-enum VirtualCamAction {
+enum VirtualCameraAction {
     StartStop,
     Start,
     Stop,

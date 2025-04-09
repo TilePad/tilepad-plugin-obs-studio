@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <div class="tile-item">
+        <label class="tile-label" for="action">Action</label>
+        <select type="url" class="tile-select" name="action" id="action">
+            <option selected disabled>None</option>
+            <option value="StartStop">Start/Stop</option>
+            <option value="Start">Start</option>
+            <option value="Stop">Stop</option>
+        </select>
+        <p class="tile-description">Virtual camera action to perform</p>
+    </div>
+</body>
+
+<script>
+    const action = document.getElementById("action");
+
+    // Handle properties received
+    window.tilepad.onProperties((properties) => {
+
+        // Ignore missing action
+        if (!properties.action) return;
+
+        // Set the current selected action
+        for (let i = 0; i < action.options.length; i++) {
+            let option = action.options.item(i);
+            if (option === null) break;
+            if (option.value !== properties.action) continue;
+            action.selectedIndex = i;
+            break;
+        }
+    });
+
+
+    // Request the current properties
+    window.tilepad.requestProperties();
+
+    action.onchange = (event) => onChangeAction(event.target.value);
+
+    function onChangeAction(value) {
+        window.tilepad.setProperty("action", value);
+    }
+</script>
+
+</html>
