@@ -213,14 +213,20 @@ impl Plugin for ObsPlugin {
         properties: serde_json::Value,
     ) {
         let action_id = ctx.action_id.as_str();
-        match action_id {
-            "recording" => {
-                let properties: RecordingActionProperties = match serde_json::from_value(properties)
-                {
-                    Ok(value) => value,
-                    Err(_) => return,
-                };
+        let action = match Action::from_action(action_id, properties) {
+            Some(Ok(value)) => value,
+            Some(Err(cause)) => {
+                tracing::error!(?cause, ?action_id, "failed to deserialize action");
+                return;
+            }
+            None => {
+                tracing::debug!(?action_id, "unknown tile action requested");
+                return;
+            }
+        };
 
+        match action {
+            Action::Recording(properties) => {
                 let action: RecordingAction = match properties.action {
                     Some(value) => value,
                     None => return,
@@ -259,10 +265,8 @@ impl Plugin for ObsPlugin {
                     }
                 });
             }
-
-            action_id => {
-                tracing::debug!(?action_id, "unknown tile action requested")
-            }
+            Action::Streaming(properties) => todo!(),
+            Action::VirtualCamera(properties) => todo!(),
         }
     }
 }
@@ -283,6 +287,26 @@ where
 
         action(client).await;
     });
+}
+
+enum Action {
+    Recording(RecordingActionProperties),
+    Streaming(StreamActionProperties),
+    VirtualCamera(VirtualCameraActionProperties),
+}
+
+impl Action {
+    pub fn from_action(
+        action_id: &str,
+        properties: serde_json::Value,
+    ) -> Option<Result<Action, serde_json::Error>> {
+        Some(match action_id {
+            "recording" => serde_json::from_value(properties).map(Action::Recording),
+            "streaming" => serde_json::from_value(properties).map(Action::Streaming),
+            "virtual_camera" => serde_json::from_value(properties).map(Action::VirtualCamera),
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -313,7 +337,7 @@ enum StreamAction {
 }
 
 #[derive(Deserialize)]
-struct VirtualCamActionProperties {
+struct VirtualCameraActionProperties {
     action: Option<VirtualCamAction>,
 }
 
