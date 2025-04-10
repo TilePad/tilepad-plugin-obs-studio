@@ -265,7 +265,30 @@ impl Plugin for ObsPlugin {
                     }
                 });
             }
-            Action::Streaming(properties) => todo!(),
+            Action::Streaming(properties) => {
+                let action: StreamAction = match properties.action {
+                    Some(value) => value,
+                    None => return,
+                };
+
+                run_with_client(self.state.clone(), async move |client| match action {
+                    StreamAction::StartStop => {
+                        if let Err(cause) = client.streaming().toggle().await {
+                            tracing::error!(?cause, "failed to toggle streaming");
+                        }
+                    }
+                    StreamAction::Start => {
+                        if let Err(cause) = client.streaming().start().await {
+                            tracing::error!(?cause, "failed to start streaming");
+                        }
+                    }
+                    StreamAction::Stop => {
+                        if let Err(cause) = client.streaming().stop().await {
+                            tracing::error!(?cause, "failed to stop streaming");
+                        }
+                    }
+                });
+            }
             Action::VirtualCamera(properties) => {
                 let action: VirtualCameraAction = match properties.action {
                     Some(value) => value,
