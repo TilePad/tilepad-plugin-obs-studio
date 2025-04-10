@@ -20,33 +20,32 @@
 </body>
 
 <script>
-    const action = document.getElementById("action");
-
-    // Handle properties received
-    window.tilepad.onProperties((properties) => {
-
-        // Ignore missing action
-        if (!properties.action) return;
-
-        // Set the current selected action
-        for (let i = 0; i < action.options.length; i++) {
-            let option = action.options.item(i);
-            if (option === null) break;
-            if (option.value !== properties.action) continue;
-            action.selectedIndex = i;
-            break;
-        }
-    });
-
+    const actionSelect = document.getElementById("action");
 
     // Request the current properties
-    window.tilepad.requestProperties();
+    tilepad.tile.getProperties()
+        // Handle properties received
+        .then((properties) => {
 
-    action.onchange = (event) => onChangeAction(event.target.value);
+            // Ignore missing action
+            if (!properties.action) return;
 
-    function onChangeAction(value) {
+            // Set the current selected action
+            for (let i = 0; i < actionSelect.options.length; i++) {
+                let option = actionSelect.options.item(i);
+                if (option === null) break;
+                if (option.value !== properties.action) continue;
+                actionSelect.selectedIndex = i;
+                break;
+            }
+        });
+
+    // Handle changing the action
+    actionSelect.onchange = (event) => {
+        const value = event.target.value;
         window.tilepad.setProperty("action", value);
-    }
+    };
+
 </script>
 
 </html>

@@ -68,8 +68,6 @@
         password.type = "password";
         password.value = "";
 
-
-
         const button = document.createElement("button");
         button.textContent = "Connect"
         button.onclick = () => {
@@ -77,7 +75,7 @@
             setView(createLoadingView("Connecting..."));
 
             // Request that the plugin authorize
-            window.tilepad.sendPluginMessage({
+            tilepad.plugin.send({
                 type: "CONNECT",
                 auth: {
                     host: host.value,
@@ -108,23 +106,22 @@
     // Set initial loading state
     setView(createLoadingView("Connecting..."));
 
-    // Handle properties received
-    window.tilepad.onProperties((newProperties, ctx) => {
-        properties = newProperties;
-        currentAction = ctx.actionId;
+    // Request the current tile
+    tilepad.tile.getTile()
+        // Handle the tile received
+        .then((tile) => {
+            // Update current state
+            properties = tile.properties;
+            currentAction = tile.actionId;
 
-        // Request connection state from the plugin
-        window.tilepad.sendPluginMessage({
-            type: "GET_CLIENT_STATE"
+            // Request connection state from the plugin
+            tilepad.plugin.send({ type: "GET_CLIENT_STATE" })
         })
-    });
-
 
 
     function onInitial() {
         setView(createLoadingView("Initializing..."))
     }
-
 
     function onNotConnected() {
         // Show authorize view
@@ -133,6 +130,14 @@
 
     function onConnecting() {
         setView(createLoadingView("Connecting..."))
+    }
+
+    function onConnectError() {
+        setView(createConnectView("Connection error"));
+    }
+
+    function onConnectionLost() {
+        setView(createConnectView("Connection lost"));
     }
 
     function onConnected() {
@@ -148,15 +153,6 @@
                 break;
         }
     }
-
-    function onConnectError() {
-        setView(createConnectView("Connection error"));
-    }
-
-    function onConnectionLost() {
-        setView(createConnectView("Connection lost"));
-    }
-
 
     const State = {
         INITIAL: "INITIAL",
@@ -178,7 +174,7 @@
 
 
     // Handle messages from plugin
-    window.tilepad.onPluginMessage((data) => {
+    tilepad.plugin.onMessage((data) => {
         switch (data.type) {
             case "CLIENT_STATE": {
                 const state = data.state;
@@ -188,8 +184,6 @@
         }
     });
 
-    // Request the current properties
-    window.tilepad.requestProperties();
 </script>
 
 </html>
