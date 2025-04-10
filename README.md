@@ -24,20 +24,25 @@ WIP plugin for OBS studio
 
 ## Features
 
-- [x] Toggle Recording 
-- [ ] Start Recording
-- [ ] Stop Recording
-- [ ] Pause Recording
-- [ ] Toggle Pause Recording
-- [ ] Start Stream
-- [ ] Stop Stream
-- [ ] Toggle Stream
-- [ ] Virtual Cam Start
-- [ ] Virtual Cam Stop
-- [ ] Virtual Cam Toggle
+- [x] Recording
+  - [x] Start
+  - [x] Stop
+  - [x] Toggle
+  - [x] Pause
+  - [x] Resume
+  - [x] Toggle Pause
+- [x] Streaming
+  - [x] Start 
+  - [x] Stop
+  - [x] Toggle
+- [x] Virtual Camera
+  - [x] Start
+  - [x] Stop
+  - [x] Toggle
 - [ ] Switch Scene
 - [ ] Switch Scene Collection
-- [ ] Switch Profile
+- [ ] Switch Profile 
 - [ ] Toggle Source Visibility
 - [ ] Audio settings changer
 - [ ] Media source control
+
