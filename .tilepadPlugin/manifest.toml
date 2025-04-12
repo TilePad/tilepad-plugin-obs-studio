@@ -7,6 +7,7 @@ description = "Tilepad OBS actions"
 
 [category]
 label = "OBS"
+icon = "images/obs.png"
 
 [[bin.native]]
 os = "windows"
