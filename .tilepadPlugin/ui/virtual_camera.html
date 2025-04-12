@@ -22,6 +22,12 @@
 <script>
     const actionSelect = document.getElementById("action");
 
+    const ACTION_LABELS = {
+        'StartStop': { label: "Toggle virtual camera" },
+        'Start': { label: "Start virtual camera" },
+        'Stop': { label: "Stop virtual camera" },
+    }
+
     // Request the current properties
     tilepad.tile.getProperties()
         // Handle properties received
@@ -43,7 +49,13 @@
     // Handle changing the action
     actionSelect.onchange = (event) => {
         const value = event.target.value;
-        window.tilepad.setProperty("action", value);
+        tilepad.tile.setProperty("action", value);
+
+        // Apply the current label
+        const label = ACTION_LABELS[value];
+        if (label !== undefined) {
+            tilepad.tile.setLabel(label)
+        }
     };
 
 </script>
