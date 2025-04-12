@@ -1099,10 +1099,13 @@ dependencies = [
 [[package]]
 name = "tilepad-plugin-sdk"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50690bb501cb35b72b2e2da15372e876325cc346a55f38bb36ab429579d460f4"
 dependencies = [
  "anyhow",
  "clap",
  "futures",
+ "parking_lot",
  "serde",
  "serde_json",
  "thiserror",

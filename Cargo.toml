@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Lock library
 parking_lot = "0.12.3"
-tilepad-plugin-sdk = { version = "0.1.0", path = "../tilepad-sdk-rs" }
+
+# Plugin SDK 
+tilepad-plugin-sdk = "0.1.0"
+
+# Async runtime
 tokio = { version = "1.44.1", features = ["full"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# OBS websocket library
 obws = "0.14.0"
