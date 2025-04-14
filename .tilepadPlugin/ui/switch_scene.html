@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <div class="tile-item">
+        <label class="tile-label" for="action">Scene</label>
+        <select type="url" class="tile-select" name="scene" id="scene">
+            <option disabled value="">Loading...</option>
+        </select>
+        <p class="tile-description">Scene to switch to</p>
+    </div>
+</body>
+
+<script>
+    const sceneSelect = document.getElementById("scene");
+
+    // Request the current properties
+    tilepad.tile.getProperties()
+        // Handle properties received
+        .then((properties) => {
+
+            // Request the list of scenes
+            tilepad.plugin.send({ type: "GET_SCENES" })
+
+            // Ignore missing action
+            if (!properties.scene) return;
+
+            const selectedIndex = getOptionIndex(sceneSelect, properties.scene);
+            if (selectedIndex === -1) return;
+
+            // Set the current selected scene
+            sceneSelect.selectedIndex = selectedIndex;
+        });
+
+    tilepad.plugin.onMessage((message) => {
+        switch (message.type) {
+            case "SCENES": {
+                setSelectOptions(sceneSelect, message.scenes)
+                break;
+            }
+        }
+    })
+
+    // Handle changing the action
+    sceneSelect.onchange = (event) => {
+        const value = event.target.value;
+        tilepad.tile.setProperty("scene", value);
+    };
+
+
+    function setSelectOptions(selectEl, options, selectedValue) {
+        selectEl.innerHTML = "";
+
+        // Add default option
+        {
+            const defaultOption = document.createElement("option");
+            defaultOption.disabled = true;
+            defaultOption.value = "";
+            defaultOption.textContent = "None";
+            defaultOption.selected = true;
+            selectEl.options.add(defaultOption);
+        }
+
+        // Add real options
+        for (const option of options) {
+            const optionEl = document.createElement("option");
+            optionEl.value = option.value;
+            optionEl.textContent = option.label;
+            selectEl.options.add(optionEl);
+        }
+
+        if (selectedValue) {
+            const optionIndex = getOptionIndex(selectEl, selectedValue);
+            if (optionIndex !== -1) {
+                selectEl.selectedIndex = optionIndex;
+            }
+        }
+    }
+
+    function getOptionIndex(selectEl, value) {
+        for (let i = 0; i < selectEl.options.length; i++) {
+            let option = selectEl.options.item(i);
+            if (option === null) break;
+            if (option.value !== value) continue;
+            return i;
+        }
+
+        return -1
+    }
+</script>
+
+</html>

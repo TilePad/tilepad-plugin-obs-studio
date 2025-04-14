@@ -19,3 +19,4 @@ serde_json = "1"
 
 # OBS websocket library
 obws = "0.14.0"
+uuid = { version = "1.16.0", features = ["v4", "serde"] }

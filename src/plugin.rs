@@ -1,10 +1,15 @@
+use obws::requests::scenes::SceneId;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, str::FromStr};
 use tilepad_plugin_sdk::{
-    inspector::Inspector, plugin::Plugin, protocol::TileInteractionContext,
-    session::PluginSessionHandle, tracing,
+    inspector::Inspector,
+    plugin::Plugin,
+    protocol::TileInteractionContext,
+    session::PluginSessionHandle,
+    tracing::{self},
 };
 use tokio::{sync::Mutex, task::spawn_local};
+use uuid::Uuid;
 
 /// Properties for the plugin itself
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,6 +30,8 @@ pub struct Auth {
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InspectorMessageIn {
     GetClientState,
+    GetProfiles,
+    GetScenes,
     Connect { auth: Auth },
 }
 
@@ -33,6 +40,15 @@ pub enum InspectorMessageIn {
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InspectorMessageOut {
     ClientState { state: String },
+    Profiles { profiles: Vec<SelectOption> },
+    Scenes { scenes: Vec<SelectOption> },
+}
+
+/// Option for a select dropdown menu
+#[derive(Deserialize, Serialize)]
+pub struct SelectOption {
+    pub label: String,
+    pub value: String,
 }
 
 #[derive(Default)]
@@ -203,6 +219,53 @@ impl Plugin for ObsPlugin {
                     state.try_connect(auth, session).await;
                 });
             }
+            InspectorMessageIn::GetProfiles => {
+                run_with_client(self.state.clone(), async move |client| {
+                    let profiles = client.profiles();
+                    let list = match profiles.list().await {
+                        Ok(value) => value,
+                        Err(cause) => {
+                            tracing::error!(?cause, "failed to get profiles");
+                            return;
+                        }
+                    };
+
+                    _ = inspector.send(InspectorMessageOut::Profiles {
+                        profiles: list
+                            .profiles
+                            .into_iter()
+                            .map(|profile| SelectOption {
+                                label: profile.clone(),
+                                value: profile,
+                            })
+                            .collect(),
+                    });
+                });
+            }
+            InspectorMessageIn::GetScenes => {
+                run_with_client(self.state.clone(), async move |client| {
+                    let scenes = client.scenes();
+
+                    let list = match scenes.list().await {
+                        Ok(value) => value,
+                        Err(cause) => {
+                            tracing::error!(?cause, "failed to get profiles");
+                            return;
+                        }
+                    };
+
+                    _ = inspector.send(InspectorMessageOut::Scenes {
+                        scenes: list
+                            .scenes
+                            .into_iter()
+                            .map(|scene| SelectOption {
+                                label: scene.id.name,
+                                value: scene.id.uuid.to_string(),
+                            })
+                            .collect(),
+                    });
+                });
+            }
         }
     }
 
@@ -313,6 +376,41 @@ impl Plugin for ObsPlugin {
                     }
                 });
             }
+            Action::SwitchScene(properties) => {
+                let scene = match properties.scene {
+                    Some(value) => value,
+                    None => return,
+                };
+
+                let scene_id = match Uuid::from_str(&scene) {
+                    Ok(value) => value,
+                    Err(_) => return,
+                };
+
+                run_with_client(self.state.clone(), async move |client| {
+                    let scenes = client.scenes();
+
+                    if let Err(cause) = scenes
+                        .set_current_program_scene(SceneId::Uuid(scene_id))
+                        .await
+                    {
+                        tracing::error!(?cause, "failed to set current scene");
+                    }
+                });
+            }
+            Action::SwitchProfile(properties) => {
+                let profile = match properties.profile {
+                    Some(value) => value,
+                    None => return,
+                };
+
+                run_with_client(self.state.clone(), async move |client| {
+                    let profiles = client.profiles();
+                    if let Err(cause) = profiles.set_current(&profile).await {
+                        tracing::error!(?cause, "failed to set current profile");
+                    }
+                });
+            }
         }
     }
 }
@@ -339,6 +437,8 @@ enum Action {
     Recording(RecordingActionProperties),
     Streaming(StreamActionProperties),
     VirtualCamera(VirtualCameraActionProperties),
+    SwitchScene(SwitchSceneProperties),
+    SwitchProfile(SwitchProfileProperties),
 }
 
 impl Action {
@@ -350,9 +450,21 @@ impl Action {
             "recording" => serde_json::from_value(properties).map(Action::Recording),
             "streaming" => serde_json::from_value(properties).map(Action::Streaming),
             "virtual_camera" => serde_json::from_value(properties).map(Action::VirtualCamera),
+            "switch_scene" => serde_json::from_value(properties).map(Action::SwitchScene),
+            "switch_profile" => serde_json::from_value(properties).map(Action::SwitchProfile),
             _ => return None,
         })
     }
+}
+
+#[derive(Deserialize)]
+struct SwitchSceneProperties {
+    scene: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SwitchProfileProperties {
+    profile: Option<String>,
 }
 
 #[derive(Deserialize)]
