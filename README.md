@@ -39,9 +39,9 @@ WIP plugin for OBS studio
   - [x] Start
   - [x] Stop
   - [x] Toggle
-- [ ] Switch Scene
+- [x] Switch Scene
 - [ ] Switch Scene Collection
-- [ ] Switch Profile 
+- [x] Switch Profile 
 - [ ] Toggle Source Visibility
 - [ ] Audio settings changer
 - [ ] Media source control
