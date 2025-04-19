@@ -1,0 +1,131 @@
+name: Cross-Compile and Bundle Plugin
+
+on:
+  # Trigger when a tag is pushed for a release
+  push:
+    tags:
+      - "*.*.*" # This will trigger when a tag like v1.0.0 is pushed
+  # Manual trigger for creating an artifact (button in the UI)
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  build:
+    name: Build plugin releases
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Binary build targets
+        include:
+          - target: x86_64-unknown-linux-gnu
+            outfile: tilepad-plugin-obs-studio
+            filename: plugin-linux-x64
+          - target: i686-unknown-linux-gnu
+            outfile: tilepad-plugin-obs-studio
+            filename: plugin-linux-x86
+          - target: x86_64-pc-windows-gnu
+            outfile: tilepad-plugin-obs-studio.exe
+            filename: plugin-windows-x64.exe
+          - target: i686-pc-windows-gnu
+            outfile: tilepad-plugin-obs-studio.exe
+            filename: plugin-windows-x86.exe
+
+    steps:
+      # Checkout the repo for building
+      - uses: actions/checkout@v4
+
+      # Setup rust for building
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      # Install dependencies for the gnu windows variants
+      - name: Install target dependencies (for windows-gnu)
+        if: contains(matrix.target, 'windows-gnu')
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64
+
+      # Install dependencies for x86 linux
+      - name: Install target dependencies (for i686 linux)
+        if: matrix.target == 'i686-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib libc6-dev-i386
+
+      # Build the binary
+      - name: Build for ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Rename the binary to the correct name
+      - name: Rename the binary
+        run: |
+          mkdir output
+          cp target/${{ matrix.target }}/release/${{ matrix.outfile }} output/${{ matrix.filename }}
+        shell: bash
+
+      # Upload the built binary as an artifact
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.filename }}
+          path: output/${{ matrix.filename }}
+
+  bundle:
+    name: Bundle Plugin
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      # Checkout the repository for the .tilepadPlugin folder
+      - uses: actions/checkout@v4
+
+      # Setup rust to use cargo install for installing the CLI
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      # Download the binaries from the uploaded build artifacts
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: downloads
+
+      # Copy the release binaries to the output directory
+      - name: Copy release binaries
+        run: |
+          mkdir -p .tilepadPlugin/bin
+          find downloads -type f -exec cp {} .tilepadPlugin/bin/ \;
+          chmod +x .tilepadPlugin/bin/*
+
+      # Install the CLI tool for bundling
+      - name: Install tilepad CLI
+        run: cargo install tilepad-cli
+
+      # Bundle the plugin
+      - name: Run tilepad bundle
+        run: tilepad bundle --name plugin
+
+      # Upload an artifact if manually triggered
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: plugin.tilepadPlugin
+          path: plugin.tilepadPlugin
+
+      # Upload a release when a tag was created
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          draft: true
+          files: plugin.tilepadPlugin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
