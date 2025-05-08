@@ -40,27 +40,52 @@
         "recording": {
             "label": "Recording",
             "description": "Interaction with OBS recording capabilities",
-            "inspector": "ui/connect.html"
+            "inspector": "ui/connect.html",
+            "icon": "images/recording.svg",
+            "icon_options": {
+                "padding": 30,
+                "background_color": "#000000"
+            }
         },
         "streaming": {
             "label": "Stream",
             "description": "Interaction with OBS streaming capabilities",
-            "inspector": "ui/connect.html"
+            "inspector": "ui/connect.html",
+            "icon": "images/stream.svg",
+            "icon_options": {
+                "padding": 30,
+                "background_color": "#000000"
+            }
         },
         "virtual_camera": {
             "label": "Virtual Cam",
             "description": "Interaction with OBS virtual camera capabilities",
-            "inspector": "ui/connect.html"
+            "inspector": "ui/connect.html",
+            "icon": "images/virtual_camera.svg",
+            "icon_options": {
+                "padding": 30,
+                "background_color": "#000000"
+            }
         },
         "switch_scene": {
             "label": "Switch Scene",
             "description": "Switch to a specific scene",
-            "inspector": "ui/connect.html"
+            "inspector": "ui/connect.html",
+            "icon": "images/scene.svg",
+            "icon_options": {
+                "padding": 30,
+                "background_color": "#000000"
+            }
         },
         "switch_profile": {
             "label": "Switch Profile",
             "description": "Switch to a specific OBS profile",
-            "inspector": "ui/connect.html"
+            "inspector": "ui/connect.html",
+            "icon": "images/profile.svg",
+            "icon_options": {
+                "padding": 30,
+                "background_color": "#000000"
+            }
         }
     }
 }
