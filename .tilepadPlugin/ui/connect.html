@@ -52,20 +52,34 @@
 
     function createConnectView(error) {
         const container = document.createElement("div");
+        container.style.gap = "15px";
+        container.style.display = "flex";
+        container.style.flexFlow = "column";
+
         const title = document.createElement("h1");
         title.textContent = "OBS Studio Socket"
         title.classList.add("title")
 
+        const text = document.createElement("h1");
+        text.textContent = "Not connected to OBS socket ensure OBS is runnnig"
+        text.classList.add("text")
+
         const host = document.createElement("input");
+        host.classList.add("tile-input")
         host.type = "text";
         host.value = "localhost";
+        host.placeholder = "Host Address"
 
         const port = document.createElement("input");
+        port.classList.add("tile-input")
         port.type = "number";
         port.value = 4455;
+        port.placeholder = "Port"
 
         const password = document.createElement("input");
+        password.classList.add("tile-input")
         password.type = "password";
+        password.placeholder = "Password"
         password.value = "";
 
         const button = document.createElement("button");
@@ -87,17 +101,19 @@
         button.classList.add("tile-button")
 
         container.appendChild(title);
+        container.appendChild(text);
+
+        if (error) {
+            const errorText = document.createElement("p");
+            errorText.textContent = `Failed to connect: ${error}`;
+            errorText.classList.add("text")
+            container.appendChild(errorText)
+        }
+
         container.appendChild(host);
         container.appendChild(port);
         container.appendChild(password);
         container.appendChild(button);
-
-        if (error) {
-            const text = document.createElement("p");
-            text.textContent = error;
-            text.classList.add("text")
-            container.appendChild(text)
-        }
 
 
         return container
