@@ -11,6 +11,11 @@ use tilepad_plugin_sdk::{
 use tokio::{sync::Mutex, task::spawn_local};
 use uuid::Uuid;
 
+use crate::{
+    action::{Action, RecordingAction, StreamAction, VirtualCameraAction},
+    messages::{InspectorMessageIn, InspectorMessageOut, SelectOption},
+};
+
 /// Properties for the plugin itself
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Properties {
@@ -23,32 +28,6 @@ pub struct Auth {
     pub host: String,
     pub port: u16,
     pub password: String,
-}
-
-/// Messages from the inspector
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum InspectorMessageIn {
-    GetClientState,
-    GetProfiles,
-    GetScenes,
-    Connect { auth: Auth },
-}
-
-/// Messages to the inspector
-#[derive(Serialize)]
-#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum InspectorMessageOut {
-    ClientState { state: String },
-    Profiles { profiles: Vec<SelectOption> },
-    Scenes { scenes: Vec<SelectOption> },
-}
-
-/// Option for a select dropdown menu
-#[derive(Deserialize, Serialize)]
-pub struct SelectOption {
-    pub label: String,
-    pub value: String,
 }
 
 #[derive(Default)]
@@ -130,11 +109,9 @@ pub enum ClientState {
 
     /// Connection error
     ConnectError {
+        #[allow(unused)]
         error: obws::error::Error,
     },
-
-    /// Lost connection
-    ConnectionLost,
 }
 
 impl std::fmt::Display for ClientState {
@@ -145,7 +122,6 @@ impl std::fmt::Display for ClientState {
             ClientState::Connecting => "CONNECTING",
             ClientState::Connected { .. } => "CONNECTED",
             ClientState::ConnectError { .. } => "CONNECT_ERROR",
-            ClientState::ConnectionLost => "CONNECTION_LOST",
         })
     }
 }
@@ -431,77 +407,4 @@ where
 
         action(client).await;
     });
-}
-
-enum Action {
-    Recording(RecordingActionProperties),
-    Streaming(StreamActionProperties),
-    VirtualCamera(VirtualCameraActionProperties),
-    SwitchScene(SwitchSceneProperties),
-    SwitchProfile(SwitchProfileProperties),
-}
-
-impl Action {
-    pub fn from_action(
-        action_id: &str,
-        properties: serde_json::Value,
-    ) -> Option<Result<Action, serde_json::Error>> {
-        Some(match action_id {
-            "recording" => serde_json::from_value(properties).map(Action::Recording),
-            "streaming" => serde_json::from_value(properties).map(Action::Streaming),
-            "virtual_camera" => serde_json::from_value(properties).map(Action::VirtualCamera),
-            "switch_scene" => serde_json::from_value(properties).map(Action::SwitchScene),
-            "switch_profile" => serde_json::from_value(properties).map(Action::SwitchProfile),
-            _ => return None,
-        })
-    }
-}
-
-#[derive(Deserialize)]
-struct SwitchSceneProperties {
-    scene: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct SwitchProfileProperties {
-    profile: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct RecordingActionProperties {
-    action: Option<RecordingAction>,
-}
-
-#[derive(Deserialize)]
-enum RecordingAction {
-    StartStop,
-    Start,
-    Stop,
-    PauseResume,
-    Pause,
-    Resume,
-}
-
-#[derive(Deserialize)]
-struct StreamActionProperties {
-    action: Option<StreamAction>,
-}
-
-#[derive(Deserialize)]
-enum StreamAction {
-    StartStop,
-    Start,
-    Stop,
-}
-
-#[derive(Deserialize)]
-struct VirtualCameraActionProperties {
-    action: Option<VirtualCameraAction>,
-}
-
-#[derive(Deserialize)]
-enum VirtualCameraAction {
-    StartStop,
-    Start,
-    Stop,
 }

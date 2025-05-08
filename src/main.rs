@@ -2,7 +2,9 @@ use plugin::ObsPlugin;
 use tilepad_plugin_sdk::{setup_tracing, start_plugin};
 use tokio::task::LocalSet;
 
-pub mod plugin;
+mod action;
+mod messages;
+mod plugin;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
