@@ -17,8 +17,10 @@ async fn main() {
         .with_file(true)
         .with_env_filter(filter)
         .with_line_number(true)
-        .with_thread_ids(true)
+        .with_thread_ids(false)
         .with_target(false)
+        .with_ansi(false)
+        .without_time()
         .finish();
 
     // use that subscriber to process traces emitted after this point
