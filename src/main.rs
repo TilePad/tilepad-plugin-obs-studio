@@ -5,6 +5,7 @@ use tokio::task::LocalSet;
 mod action;
 mod messages;
 mod plugin;
+mod state;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {

@@ -1,4 +1,4 @@
-use crate::plugin::Auth;
+use crate::{state::Auth, state::ClientState};
 use serde::{Deserialize, Serialize};
 
 /// Messages from the inspector
@@ -15,7 +15,7 @@ pub enum InspectorMessageIn {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InspectorMessageOut {
-    ClientState { state: String },
+    ClientState { state: ClientState },
     Profiles { profiles: Vec<SelectOption> },
     Scenes { scenes: Vec<SelectOption> },
 }

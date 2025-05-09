@@ -19,28 +19,34 @@
 <script>
     const profileSelect = document.getElementById("profile");
 
+    let currentProperties;
+
     // Request the current properties
     tilepad.tile.getProperties()
         // Handle properties received
         .then((properties) => {
+            currentProperties = properties;
 
             // Request the list of profiles
             tilepad.plugin.send({ type: "GET_PROFILES" })
+        })
+        .catch(console.error);
 
-            // Ignore missing profile
-            if (!properties.profile) return;
-
-            const selectedIndex = getOptionIndex(profileSelect, properties.profile);
-            if (selectedIndex === -1) return;
-
-            // Set the current selected profile
-            profileSelect.selectedIndex = selectedIndex;
-        });
 
     tilepad.plugin.onMessage((message) => {
         switch (message.type) {
             case "PROFILES": {
-                setSelectOptions(profileSelect, message.profiles)
+                setSelectOptions(profileSelect, message.profiles, currentProperties.profile)
+                break;
+            }
+            case "CLIENT_STATE": {
+                const state = message.state;
+                if (state !== "CONNECTED") {
+                    window.location.href = "./connect.html";
+                } else {
+                    // Request the list of profiles
+                    tilepad.plugin.send({ type: "GET_PROFILES" })
+                }
                 break;
             }
         }

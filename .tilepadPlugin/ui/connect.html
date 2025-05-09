@@ -89,6 +89,17 @@
         password.placeholder = "Password"
         password.value = defaultAuth.password;
 
+        const togglePasswordCheckbox = document.createElement("input");
+        togglePasswordCheckbox.classList.add("tile-checkbox")
+        togglePasswordCheckbox.type = "checkbox";
+        togglePasswordCheckbox.onclick = () => {
+            if (password.type === "text") {
+                password.type = "password"
+            } else {
+                password.type = "text"
+            }
+        }
+
         const button = document.createElement("button");
         button.textContent = "Connect"
         button.onclick = () => {
@@ -120,6 +131,7 @@
         container.appendChild(host);
         container.appendChild(port);
         container.appendChild(password);
+        container.appendChild(togglePasswordCheckbox);
         container.appendChild(button);
 
 
@@ -197,6 +209,7 @@
         INITIAL: "INITIAL",
         NOT_CONNECTED: "NOT_CONNECTED",
         CONNECTING: "CONNECTED",
+        RETRY_CONNECTING: "RETRY_CONNECTING",
         CONNECTED: "CONNECTED",
         CONNECT_ERROR: "CONNECT_ERROR",
         CONNECTION_LOST: "CONNECTION_LOST"
@@ -208,7 +221,8 @@
         [State.CONNECTING]: onConnecting,
         [State.CONNECTED]: onConnected,
         [State.CONNECT_ERROR]: onConnectError,
-        [State.CONNECTION_LOST]: onConnectionLost
+        [State.CONNECTION_LOST]: onConnectionLost,
+        [State.RETRY_CONNECTING]: onConnectionLost
     }
 
 

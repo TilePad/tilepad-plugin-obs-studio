@@ -1,6 +1,6 @@
 use obws::requests::scenes::SceneId;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, rc::Rc, str::FromStr};
+use std::{rc::Rc, str::FromStr};
 use tilepad_plugin_sdk::{
     inspector::Inspector,
     plugin::Plugin,
@@ -8,12 +8,13 @@ use tilepad_plugin_sdk::{
     session::PluginSessionHandle,
     tracing::{self},
 };
-use tokio::{sync::Mutex, task::spawn_local};
+use tokio::task::spawn_local;
 use uuid::Uuid;
 
 use crate::{
     action::{Action, RecordingAction, StreamAction, VirtualCameraAction},
     messages::{InspectorMessageIn, InspectorMessageOut, SelectOption},
+    state::{Auth, ClientState, State},
 };
 
 /// Properties for the plugin itself
@@ -22,108 +23,9 @@ pub struct Properties {
     pub auth: Option<Auth>,
 }
 
-/// Properties for the plugin itself
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Auth {
-    pub host: String,
-    pub port: u16,
-    pub password: String,
-}
-
 #[derive(Default)]
 pub struct ObsPlugin {
     state: Rc<State>,
-}
-
-#[derive(Default)]
-pub struct State {
-    client_state: Mutex<ClientState>,
-    inspector: RefCell<Option<Inspector>>,
-}
-
-impl State {
-    fn set_inspector(&self, inspector: Option<Inspector>) {
-        *self.inspector.borrow_mut() = inspector;
-    }
-
-    async fn set_client_state(&self, client_state: ClientState) {
-        let state = format!("{}", &client_state);
-        {
-            *self.client_state.lock().await = client_state;
-        }
-
-        if let Some(inspector) = self.inspector.borrow().as_ref() {
-            _ = inspector.send(InspectorMessageOut::ClientState { state });
-        }
-    }
-
-    async fn try_connect(&self, auth: Auth, session: PluginSessionHandle) {
-        {
-            if matches!(
-                &*self.client_state.lock().await,
-                ClientState::Connecting | ClientState::Connected { .. }
-            ) {
-                return;
-            }
-        }
-
-        // Set to connecting state
-        self.set_client_state(ClientState::Connecting).await;
-
-        let mut password: Option<String> = None;
-        if !auth.password.trim().is_empty() {
-            password = Some(auth.password.clone())
-        }
-
-        let client = match obws::Client::connect(auth.host.clone(), auth.port, password).await {
-            Ok(value) => value,
-            Err(error) => {
-                self.set_client_state(ClientState::ConnectError { error })
-                    .await;
-                return;
-            }
-        };
-
-        _ = session.set_properties(Properties { auth: Some(auth) });
-
-        self.set_client_state(ClientState::Connected { client })
-            .await;
-    }
-}
-
-#[derive(Default)]
-pub enum ClientState {
-    /// Initial state
-    #[default]
-    Initial,
-
-    NotConnected,
-
-    /// Connecting to the client
-    Connecting,
-
-    /// Connected to the client
-    Connected {
-        client: obws::Client,
-    },
-
-    /// Connection error
-    ConnectError {
-        #[allow(unused)]
-        error: obws::error::Error,
-    },
-}
-
-impl std::fmt::Display for ClientState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            ClientState::Initial => "INITIAL",
-            ClientState::NotConnected => "NOT_CONNECTED",
-            ClientState::Connecting => "CONNECTING",
-            ClientState::Connected { .. } => "CONNECTED",
-            ClientState::ConnectError { .. } => "CONNECT_ERROR",
-        })
-    }
 }
 
 impl ObsPlugin {
@@ -133,30 +35,42 @@ impl ObsPlugin {
 }
 
 impl Plugin for ObsPlugin {
-    fn on_properties(&self, session: &PluginSessionHandle, properties: serde_json::Value) {
-        let session = session.clone();
-        if let Ok(properties) = serde_json::from_value::<Properties>(properties) {
-            let auth = match properties.auth {
-                Some(value) => value,
-                None => {
-                    let state = self.state.clone();
-                    spawn_local(async move {
-                        state.set_client_state(ClientState::NotConnected).await;
-                    });
-                    return;
-                }
-            };
-
-            let state = self.state.clone();
-            spawn_local(async move {
-                state.try_connect(auth, session).await;
-            });
-        } else {
-            let state = self.state.clone();
-            spawn_local(async move {
-                state.set_client_state(ClientState::NotConnected).await;
-            });
+    fn on_properties(&self, _session: &PluginSessionHandle, properties: serde_json::Value) {
+        // Nothing to do if already connected
+        if matches!(
+            self.state.get_state(),
+            ClientState::Connecting | ClientState::Connected { .. }
+        ) {
+            return;
         }
+
+        let properties = match serde_json::from_value::<Properties>(properties) {
+            Ok(value) => value,
+
+            // Invalid properties
+            Err(_) => {
+                self.state.set_state(ClientState::NotConnected);
+                return;
+            }
+        };
+
+        let auth = match properties.auth {
+            Some(value) => value,
+
+            // No authentication
+            None => {
+                self.state.set_state(ClientState::NotConnected);
+                return;
+            }
+        };
+
+        let state = self.state.clone();
+        spawn_local(async move {
+            if state.try_connect(auth.clone(), false).await.is_err() {
+                // Retry connection in the background
+                state.queue_background_retry(auth);
+            }
+        });
     }
 
     fn on_inspector_open(&self, _session: &PluginSessionHandle, inspector: Inspector) {
@@ -178,31 +92,38 @@ impl Plugin for ObsPlugin {
             Err(_) => return,
         };
 
-        let session = session.clone();
-
         match message {
             InspectorMessageIn::GetClientState => {
-                let state = self.state.clone();
-                spawn_local(async move {
-                    let client_state = &mut *state.client_state.lock().await;
-                    let state = { format!("{}", &client_state) };
-                    _ = inspector.send(InspectorMessageOut::ClientState { state });
+                _ = inspector.send(InspectorMessageOut::ClientState {
+                    state: self.state.get_state(),
                 });
             }
             InspectorMessageIn::Connect { auth } => {
+                let session = session.clone();
                 let state = self.state.clone();
+
+                // Nothing to do if already connected
+                if matches!(
+                    state.get_state(),
+                    ClientState::Connecting | ClientState::Connected { .. }
+                ) {
+                    return;
+                }
+
                 spawn_local(async move {
-                    state.try_connect(auth, session).await;
+                    if state.try_connect(auth.clone(), false).await.is_ok() {
+                        _ = session.set_properties(Properties { auth: Some(auth) });
+                    }
                 });
             }
             InspectorMessageIn::GetProfiles => {
-                run_with_client(self.state.clone(), async move |client| {
+                self.state.clone().run_with_client(async move |client| {
                     let profiles = client.profiles();
                     let list = match profiles.list().await {
                         Ok(value) => value,
                         Err(cause) => {
                             tracing::error!(?cause, "failed to get profiles");
-                            return;
+                            return Err(cause);
                         }
                     };
 
@@ -216,17 +137,19 @@ impl Plugin for ObsPlugin {
                             })
                             .collect(),
                     });
+
+                    Ok(())
                 });
             }
             InspectorMessageIn::GetScenes => {
-                run_with_client(self.state.clone(), async move |client| {
+                self.state.clone().run_with_client(async move |client| {
                     let scenes = client.scenes();
 
                     let list = match scenes.list().await {
                         Ok(value) => value,
                         Err(cause) => {
                             tracing::error!(?cause, "failed to get profiles");
-                            return;
+                            return Err(cause);
                         }
                     };
 
@@ -240,6 +163,8 @@ impl Plugin for ObsPlugin {
                             })
                             .collect(),
                     });
+
+                    Ok(())
                 });
             }
         }
@@ -271,37 +196,47 @@ impl Plugin for ObsPlugin {
                     None => return,
                 };
 
-                run_with_client(self.state.clone(), async move |client| match action {
-                    RecordingAction::StartStop => {
-                        if let Err(cause) = client.recording().toggle().await {
-                            tracing::error!(?cause, "failed to toggle recording");
+                self.state.clone().run_with_client(async move |client| {
+                    match action {
+                        RecordingAction::StartStop => {
+                            if let Err(cause) = client.recording().toggle().await {
+                                tracing::error!(?cause, "failed to toggle recording");
+                                return Err(cause);
+                            }
+                        }
+                        RecordingAction::Start => {
+                            if let Err(cause) = client.recording().start().await {
+                                tracing::error!(?cause, "failed to start recording");
+                                return Err(cause);
+                            }
+                        }
+                        RecordingAction::Stop => {
+                            if let Err(cause) = client.recording().stop().await {
+                                tracing::error!(?cause, "failed to stop recording");
+                                return Err(cause);
+                            }
+                        }
+                        RecordingAction::PauseResume => {
+                            if let Err(cause) = client.recording().toggle_pause().await {
+                                tracing::error!(?cause, "failed to toggle recording pause");
+                                return Err(cause);
+                            }
+                        }
+                        RecordingAction::Pause => {
+                            if let Err(cause) = client.recording().pause().await {
+                                tracing::error!(?cause, "failed to pause recording");
+                                return Err(cause);
+                            }
+                        }
+                        RecordingAction::Resume => {
+                            if let Err(cause) = client.recording().resume().await {
+                                tracing::error!(?cause, "failed to resume recording");
+                                return Err(cause);
+                            }
                         }
                     }
-                    RecordingAction::Start => {
-                        if let Err(cause) = client.recording().start().await {
-                            tracing::error!(?cause, "failed to start recording");
-                        }
-                    }
-                    RecordingAction::Stop => {
-                        if let Err(cause) = client.recording().stop().await {
-                            tracing::error!(?cause, "failed to stop recording");
-                        }
-                    }
-                    RecordingAction::PauseResume => {
-                        if let Err(cause) = client.recording().toggle_pause().await {
-                            tracing::error!(?cause, "failed to toggle recording pause");
-                        }
-                    }
-                    RecordingAction::Pause => {
-                        if let Err(cause) = client.recording().pause().await {
-                            tracing::error!(?cause, "failed to pause recording");
-                        }
-                    }
-                    RecordingAction::Resume => {
-                        if let Err(cause) = client.recording().resume().await {
-                            tracing::error!(?cause, "failed to resume recording");
-                        }
-                    }
+
+                    Ok(())
                 });
             }
             Action::Streaming(properties) => {
@@ -310,22 +245,29 @@ impl Plugin for ObsPlugin {
                     None => return,
                 };
 
-                run_with_client(self.state.clone(), async move |client| match action {
-                    StreamAction::StartStop => {
-                        if let Err(cause) = client.streaming().toggle().await {
-                            tracing::error!(?cause, "failed to toggle streaming");
+                self.state.clone().run_with_client(async move |client| {
+                    match action {
+                        StreamAction::StartStop => {
+                            if let Err(cause) = client.streaming().toggle().await {
+                                tracing::error!(?cause, "failed to toggle streaming");
+                                return Err(cause);
+                            }
+                        }
+                        StreamAction::Start => {
+                            if let Err(cause) = client.streaming().start().await {
+                                tracing::error!(?cause, "failed to start streaming");
+                                return Err(cause);
+                            }
+                        }
+                        StreamAction::Stop => {
+                            if let Err(cause) = client.streaming().stop().await {
+                                tracing::error!(?cause, "failed to stop streaming");
+                                return Err(cause);
+                            }
                         }
                     }
-                    StreamAction::Start => {
-                        if let Err(cause) = client.streaming().start().await {
-                            tracing::error!(?cause, "failed to start streaming");
-                        }
-                    }
-                    StreamAction::Stop => {
-                        if let Err(cause) = client.streaming().stop().await {
-                            tracing::error!(?cause, "failed to stop streaming");
-                        }
-                    }
+
+                    Ok(())
                 });
             }
             Action::VirtualCamera(properties) => {
@@ -334,22 +276,29 @@ impl Plugin for ObsPlugin {
                     None => return,
                 };
 
-                run_with_client(self.state.clone(), async move |client| match action {
-                    VirtualCameraAction::StartStop => {
-                        if let Err(cause) = client.virtual_cam().toggle().await {
-                            tracing::error!(?cause, "failed to toggle virtual camera");
+                self.state.clone().run_with_client(async move |client| {
+                    match action {
+                        VirtualCameraAction::StartStop => {
+                            if let Err(cause) = client.virtual_cam().toggle().await {
+                                tracing::error!(?cause, "failed to toggle virtual camera");
+                                return Err(cause);
+                            }
+                        }
+                        VirtualCameraAction::Start => {
+                            if let Err(cause) = client.virtual_cam().start().await {
+                                tracing::error!(?cause, "failed to start virtual camera");
+                                return Err(cause);
+                            }
+                        }
+                        VirtualCameraAction::Stop => {
+                            if let Err(cause) = client.virtual_cam().stop().await {
+                                tracing::error!(?cause, "failed to stop virtual camera");
+                                return Err(cause);
+                            }
                         }
                     }
-                    VirtualCameraAction::Start => {
-                        if let Err(cause) = client.virtual_cam().start().await {
-                            tracing::error!(?cause, "failed to start virtual camera");
-                        }
-                    }
-                    VirtualCameraAction::Stop => {
-                        if let Err(cause) = client.virtual_cam().stop().await {
-                            tracing::error!(?cause, "failed to stop virtual camera");
-                        }
-                    }
+
+                    Ok(())
                 });
             }
             Action::SwitchScene(properties) => {
@@ -363,7 +312,7 @@ impl Plugin for ObsPlugin {
                     Err(_) => return,
                 };
 
-                run_with_client(self.state.clone(), async move |client| {
+                self.state.clone().run_with_client(async move |client| {
                     let scenes = client.scenes();
 
                     if let Err(cause) = scenes
@@ -371,7 +320,10 @@ impl Plugin for ObsPlugin {
                         .await
                     {
                         tracing::error!(?cause, "failed to set current scene");
+                        return Err(cause);
                     }
+
+                    Ok(())
                 });
             }
             Action::SwitchProfile(properties) => {
@@ -380,31 +332,16 @@ impl Plugin for ObsPlugin {
                     None => return,
                 };
 
-                run_with_client(self.state.clone(), async move |client| {
+                self.state.clone().run_with_client(async move |client| {
                     let profiles = client.profiles();
                     if let Err(cause) = profiles.set_current(&profile).await {
                         tracing::error!(?cause, "failed to set current profile");
+                        return Err(cause);
                     }
+
+                    Ok(())
                 });
             }
         }
     }
-}
-
-/// Run the provided action in a local background task using the
-/// obs client (Only runs if the client is connected)
-fn run_with_client<F>(state: Rc<State>, action: F)
-where
-    F: for<'a> AsyncFnOnce(&'a mut obws::Client) -> (),
-    F: 'static,
-{
-    spawn_local(async move {
-        let client = &mut *state.client_state.lock().await;
-        let client = match client {
-            ClientState::Connected { client } => client,
-            _ => return,
-        };
-
-        action(client).await;
-    });
 }

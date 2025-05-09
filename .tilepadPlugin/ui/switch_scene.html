@@ -19,28 +19,33 @@
 <script>
     const sceneSelect = document.getElementById("scene");
 
+    let currentProperties;
+
     // Request the current properties
     tilepad.tile.getProperties()
         // Handle properties received
         .then((properties) => {
+            currentProperties = properties;
 
             // Request the list of scenes
             tilepad.plugin.send({ type: "GET_SCENES" })
-
-            // Ignore missing action
-            if (!properties.scene) return;
-
-            const selectedIndex = getOptionIndex(sceneSelect, properties.scene);
-            if (selectedIndex === -1) return;
-
-            // Set the current selected scene
-            sceneSelect.selectedIndex = selectedIndex;
-        });
+        })
+        .catch(console.error);
 
     tilepad.plugin.onMessage((message) => {
         switch (message.type) {
             case "SCENES": {
-                setSelectOptions(sceneSelect, message.scenes)
+                setSelectOptions(sceneSelect, message.scenes, currentProperties.scene)
+                break;
+            }
+            case "CLIENT_STATE": {
+                const state = message.state;
+                if (state !== "CONNECTED") {
+                    window.location.href = "./connect.html";
+                } else {
+                    // Request the list of scenes
+                    tilepad.plugin.send({ type: "GET_SCENES" })
+                }
                 break;
             }
         }
