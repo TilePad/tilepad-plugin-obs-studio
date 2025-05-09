@@ -4,7 +4,10 @@ use std::{
     time::Duration,
 };
 
-use obws::client::{ConnectConfig, DEFAULT_BROADCAST_CAPACITY};
+use obws::{
+    client::{ConnectConfig, DEFAULT_BROADCAST_CAPACITY, HandshakeError},
+    responses::WebSocketCloseCode,
+};
 use serde::{Deserialize, Serialize};
 use tilepad_plugin_sdk::{inspector::Inspector, tracing};
 use tokio::{
@@ -24,6 +27,7 @@ pub enum ClientState {
     RetryConnecting,
     Connected,
     ConnectError,
+    InvalidAuth,
 }
 
 /// Properties for the plugin itself
@@ -93,11 +97,26 @@ impl State {
             let state = self.clone();
             async move {
                 loop {
-                    // Attempt to connect
-                    if state.try_connect(auth.clone(), true).await.is_ok() {
-                        state.connect_retry_task.replace(None);
-                        break;
-                    }
+                    match state.try_connect(auth.clone(), true).await {
+                        Ok(_) => {
+                            state.connect_retry_task.replace(None);
+                            break;
+                        }
+                        // Handle authentication failure
+                        Err(ObsError::Handshake(HandshakeError::ConnectionClosed(details)))
+                            if details.as_ref().is_some_and(|details| {
+                                (Into::<u16>::into(details.code))
+                                    == (WebSocketCloseCode::AuthenticationFailed as u16)
+                            }) =>
+                        {
+                            // Authentication is invalid, don't keep retrying
+                            state.connect_retry_task.replace(None);
+                            state.set_state(ClientState::InvalidAuth);
+                            break;
+                        }
+
+                        Err(_) => {}
+                    };
 
                     // Wait for next attempt
                     sleep(Duration::from_secs(10)).await;
@@ -138,8 +157,24 @@ impl State {
 
         let client = match obws::Client::connect_with_config(config).await {
             Ok(value) => value,
+
             Err(error) => {
-                self.set_state(ClientState::ConnectError);
+                match &error {
+                    // Handle authentication failure
+                    ObsError::Handshake(HandshakeError::ConnectionClosed(details))
+                        if details.as_ref().is_some_and(|details| {
+                            (Into::<u16>::into(details.code))
+                                == (WebSocketCloseCode::AuthenticationFailed as u16)
+                        }) =>
+                    {
+                        self.set_state(ClientState::InvalidAuth);
+                    }
+
+                    _ => {
+                        self.set_state(ClientState::ConnectError);
+                    }
+                }
+
                 tracing::error!(?error, "failed to connect");
                 return Err(error);
             }
@@ -173,27 +208,48 @@ impl State {
         match action(client).await {
             Ok(value) => Ok(Some(value)),
             Err(err) => {
+                let mut reset = false;
+
                 match &err {
-                    // We've lost connection or something of the sort
-                    ObsError::Send(_) => {
-                        // Clear the client lock value then drop it
-                        {
-                            *client_lock = None;
-                            drop(client_lock);
-                        }
+                    ObsError::Handshake(HandshakeError::ConnectionClosed(details)) => {
+                        // Handle authentication failure
+                        if details.as_ref().is_some_and(|details| {
+                            (Into::<u16>::into(details.code))
+                                == (WebSocketCloseCode::AuthenticationFailed as u16)
+                        }) {
+                            reset = true;
 
-                        // Update connection state
-                        self.client_state.replace(ClientState::NotConnected);
-
-                        // Queue retry connect attempt
-                        let auth = self.current_auth.borrow().clone();
-                        if let Some(auth) = auth {
-                            self.queue_background_retry(auth);
+                            // Update connection state
+                            self.set_state(ClientState::InvalidAuth);
                         }
                     }
 
-                    cause => {
-                        tracing::error!(?cause, "unhandled obs error");
+                    // We've lost connection or something of the sort
+                    ObsError::Send(_) => {
+                        reset = true;
+
+                        // Update connection state
+                        self.client_state.replace(ClientState::NotConnected);
+                    }
+
+                    _ => {}
+                }
+
+                if !reset {
+                    tracing::error!(?err, "unhandled obs error");
+                }
+
+                if reset {
+                    // Clear the client lock value then drop it
+                    {
+                        *client_lock = None;
+                        drop(client_lock);
+                    }
+
+                    // Queue retry connect attempt
+                    let auth = self.current_auth.borrow().clone();
+                    if let Some(auth) = auth {
+                        self.queue_background_retry(auth);
                     }
                 }
 

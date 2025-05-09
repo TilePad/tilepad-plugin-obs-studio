@@ -12,6 +12,8 @@
 </body>
 
 <script>
+
+    let properties;
     let currentAction = null;
 
     // Default authentication prompt values
@@ -185,6 +187,10 @@
         setView(createConnectView("Connection lost"));
     }
 
+    function onInvalidAuth() {
+        setView(createConnectView("Invalid password"));
+    }
+
     function onConnected() {
         switch (currentAction) {
             case "recording":
@@ -212,7 +218,8 @@
         RETRY_CONNECTING: "RETRY_CONNECTING",
         CONNECTED: "CONNECTED",
         CONNECT_ERROR: "CONNECT_ERROR",
-        CONNECTION_LOST: "CONNECTION_LOST"
+        CONNECTION_LOST: "CONNECTION_LOST",
+        INVALID_AUTH: "INVALID_AUTH"
     }
 
     const STATE_CALLBACKS = {
@@ -222,7 +229,8 @@
         [State.CONNECTED]: onConnected,
         [State.CONNECT_ERROR]: onConnectError,
         [State.CONNECTION_LOST]: onConnectionLost,
-        [State.RETRY_CONNECTING]: onConnectionLost
+        [State.RETRY_CONNECTING]: onConnectionLost,
+        [State.INVALID_AUTH]: onInvalidAuth
     }
 
 
