@@ -14,6 +14,10 @@
 <script>
     let currentAction = null;
 
+    // Default authentication prompt values
+    let defaultAuth = { host: "localhost", port: 4455, password: "" };
+    let dirty = false;
+
     function setView(content) {
         const root = document.getElementById("root");
         root.innerHTML = "";
@@ -65,22 +69,25 @@
         text.classList.add("text")
 
         const host = document.createElement("input");
+        host.id = "hostInput";
         host.classList.add("tile-input")
         host.type = "text";
-        host.value = "localhost";
-        host.placeholder = "Host Address"
+        host.value = defaultAuth.host;
+        host.placeholder = "Host Address";
 
         const port = document.createElement("input");
+        port.id = "portInput";
         port.classList.add("tile-input")
         port.type = "number";
-        port.value = 4455;
+        port.value = defaultAuth.port;
         port.placeholder = "Port"
 
         const password = document.createElement("input");
+        password.id = "passwordInput";
         password.classList.add("tile-input")
         password.type = "password";
         password.placeholder = "Password"
-        password.value = "";
+        password.value = defaultAuth.password;
 
         const button = document.createElement("button");
         button.textContent = "Connect"
@@ -122,18 +129,28 @@
     // Set initial loading state
     setView(createLoadingView("Connecting..."));
 
-    // Request the current tile
-    tilepad.tile.getTile()
-        // Handle the tile received
-        .then((tile) => {
-            // Update current state
-            properties = tile.properties;
-            currentAction = tile.actionId;
+    async function init() {
+        const [tile, pluginProperties] = await Promise.all([
+            tilepad.tile.getTile(),
+            tilepad.plugin.getProperties()
+        ])
 
-            // Request connection state from the plugin
-            tilepad.plugin.send({ type: "GET_CLIENT_STATE" })
-        })
+        // Update current state
+        properties = tile.properties;
+        currentAction = tile.actionId;
 
+        // Request connection state from the plugin
+        tilepad.plugin.send({ type: "GET_CLIENT_STATE" })
+
+        if (pluginProperties.auth) {
+            defaultAuth = {
+                ...pluginProperties.auth
+            }
+        }
+    }
+
+
+    init().catch(console.error);
 
     function onInitial() {
         setView(createLoadingView("Initializing..."))
