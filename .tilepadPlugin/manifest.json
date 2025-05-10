@@ -2,7 +2,7 @@
     "plugin": {
         "id": "com.jacobtread.tilepad.obs-studio",
         "name": "OBS Studio",
-        "version": "0.0.1",
+        "version": "0.1.0",
         "authors": [
             "Jacobtread"
         ],
