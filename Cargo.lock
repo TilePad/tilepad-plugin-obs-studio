@@ -1042,9 +1042,9 @@ dependencies = [
 
 [[package]]
 name = "tilepad-plugin-sdk"
-version = "0.2.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc768bbb52dec34a5794823521950579068c3e531c4ba8767a249ba8533406bc"
+checksum = "b2f661cee150d19fdaae9675c086ef5f6c702472468010726ad9206f0de9d893"
 dependencies = [
  "clap",
  "futures-util",

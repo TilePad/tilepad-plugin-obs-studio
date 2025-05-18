@@ -2,10 +2,7 @@ use obws::requests::scenes::SceneId;
 use serde::{Deserialize, Serialize};
 use std::{rc::Rc, str::FromStr};
 use tilepad_plugin_sdk::{
-    inspector::Inspector,
-    plugin::Plugin,
-    protocol::TileInteractionContext,
-    session::PluginSessionHandle,
+    Inspector, Plugin, PluginSessionHandle, TileInteractionContext,
     tracing::{self},
 };
 use tokio::task::spawn_local;
@@ -35,7 +32,7 @@ impl ObsPlugin {
 }
 
 impl Plugin for ObsPlugin {
-    fn on_properties(&self, _session: &PluginSessionHandle, properties: serde_json::Value) {
+    fn on_properties(&mut self, _session: &PluginSessionHandle, properties: serde_json::Value) {
         // Nothing to do if already connected
         if matches!(
             self.state.get_state(),
@@ -73,16 +70,16 @@ impl Plugin for ObsPlugin {
         });
     }
 
-    fn on_inspector_open(&self, _session: &PluginSessionHandle, inspector: Inspector) {
+    fn on_inspector_open(&mut self, _session: &PluginSessionHandle, inspector: Inspector) {
         self.state.set_inspector(Some(inspector));
     }
 
-    fn on_inspector_close(&self, _session: &PluginSessionHandle, _inspector: Inspector) {
+    fn on_inspector_close(&mut self, _session: &PluginSessionHandle, _inspector: Inspector) {
         self.state.set_inspector(None);
     }
 
     fn on_inspector_message(
-        &self,
+        &mut self,
         session: &PluginSessionHandle,
         inspector: Inspector,
         message: serde_json::Value,
@@ -171,7 +168,7 @@ impl Plugin for ObsPlugin {
     }
 
     fn on_tile_clicked(
-        &self,
+        &mut self,
         _session: &PluginSessionHandle,
         ctx: TileInteractionContext,
         properties: serde_json::Value,

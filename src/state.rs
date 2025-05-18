@@ -9,7 +9,7 @@ use obws::{
     responses::WebSocketCloseCode,
 };
 use serde::{Deserialize, Serialize};
-use tilepad_plugin_sdk::{inspector::Inspector, tracing};
+use tilepad_plugin_sdk::{Inspector, tracing};
 use tokio::{
     task::{JoinHandle, spawn_local},
     time::sleep,
