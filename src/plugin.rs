@@ -36,7 +36,7 @@ impl Plugin for ObsPlugin {
         // Nothing to do if already connected
         if matches!(
             self.state.get_state(),
-            ClientState::Connecting | ClientState::Connected { .. }
+            ClientState::Connecting | ClientState::Connected
         ) {
             return;
         }
@@ -102,7 +102,7 @@ impl Plugin for ObsPlugin {
                 // Nothing to do if already connected
                 if matches!(
                     state.get_state(),
-                    ClientState::Connecting | ClientState::Connected { .. }
+                    ClientState::Connecting | ClientState::Connected
                 ) {
                     return;
                 }
