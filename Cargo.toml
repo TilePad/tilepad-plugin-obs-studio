@@ -8,7 +8,7 @@ edition = "2024"
 parking_lot = "0.12.3"
 
 # Plugin SDK
-tilepad-plugin-sdk = "0.4.0"
+tilepad-plugin-sdk = "0.6.0"
 
 # Async runtime
 tokio = { version = "1.44.1", features = ["full"] }
