@@ -5,7 +5,8 @@
         "name": "OBS Studio",
         "version": "0.1.0",
         "authors": ["Jacobtread"],
-        "description": "Tilepad OBS actions"
+        "description": "Tilepad OBS actions",
+        "icon": "images/obs-logo.png"
     },
     "category": {
         "label": "OBS",
