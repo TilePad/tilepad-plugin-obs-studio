@@ -1,12 +1,11 @@
 use obws::requests::scenes::SceneId;
 use serde::{Deserialize, Serialize};
-use std::{rc::Rc, str::FromStr};
+use std::rc::Rc;
 use tilepad_plugin_sdk::{
     Inspector, Plugin, PluginSessionHandle, TileInteractionContext,
     tracing::{self},
 };
 use tokio::task::spawn_local;
-use uuid::Uuid;
 
 use crate::{
     action::{Action, RecordingAction, StreamAction, VirtualCameraAction},
@@ -304,7 +303,7 @@ impl Plugin for ObsPlugin {
                     None => return,
                 };
 
-                let scene_id = match Uuid::from_str(&scene) {
+                let scene_id = match scene.parse().map(SceneId::Uuid) {
                     Ok(value) => value,
                     Err(_) => return,
                 };
@@ -312,10 +311,7 @@ impl Plugin for ObsPlugin {
                 self.state.clone().run_with_client(async move |client| {
                     let scenes = client.scenes();
 
-                    if let Err(cause) = scenes
-                        .set_current_program_scene(SceneId::Uuid(scene_id))
-                        .await
-                    {
+                    if let Err(cause) = scenes.set_current_program_scene(scene_id).await {
                         tracing::error!(?cause, "failed to set current scene");
                         return Err(cause);
                     }
