@@ -1084,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "tilepad-plugin-obs-studio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "obws",
  "serde",

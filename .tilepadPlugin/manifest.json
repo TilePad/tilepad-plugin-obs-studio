@@ -3,7 +3,7 @@
     "plugin": {
         "id": "com.jacobtread.tilepad.obs-studio",
         "name": "OBS Studio",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "authors": ["Jacobtread"],
         "description": "Tilepad OBS actions",
         "icon": "images/obs-logo.png"
