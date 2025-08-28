@@ -1,11 +1,10 @@
 {
+    "$schema": "https://tilepad.pages.dev/schemas/0.9.0/plugins.json",
     "plugin": {
         "id": "com.jacobtread.tilepad.obs-studio",
         "name": "OBS Studio",
         "version": "0.1.0",
-        "authors": [
-            "Jacobtread"
-        ],
+        "authors": ["Jacobtread"],
         "description": "Tilepad OBS actions"
     },
     "category": {
